@@ -89,7 +89,7 @@
 <body>
   <div class="container">
     <h1>👨‍💻 스마트 공학 디버깅 메이트</h1>
-    <div class="subtitle">Firebase + Claude 3.5 API + 웹 TTS 연동 하드웨어 가이드 플랫폼</div>
+    <div class="subtitle">Firebase + ChatGPT API + 웹 TTS 연동 하드웨어 가이드 플랫폼</div>
 
     <section id="authSection">
       <div class="auth-box">
@@ -112,7 +112,7 @@
 
       <div class="workspace">
         <div class="panel">
-          <h3>🔍 Claude AI 디버깅 가이드 요청</h3>
+          <h3>🔍 AI 디버깅 가이드 요청 (ChatGPT)</h3>
           <textarea id="questionInput" placeholder="회로 에러 증상이나 공학 개념을 질문하세요.&#13;예) 아두이노 Uno에 LED를 연결했는데 불이 안 들어와. 해결 절차 알려줘."></textarea>
           
           <div class="option-box">
@@ -126,8 +126,8 @@
             <button class="tts-btn" id="stopTtsBtn">🔊 음성 중지</button>
           </div>
 
-          <h4>📢 실시간 AI 분석 결과 (Claude 3.5)</h4>
-          <div id="answerBox" class="answer-display">아직 생성된 가이드가 없습니다. 질문을 입력하면 Claude의 음성 가이드와 함께 이곳에 표시됩니다.</div>
+          <h4>📢 실시간 AI 분석 결과</h4>
+          <div id="answerBox" class="answer-display">아직 생성된 가이드가 없습니다. 질문을 입력하면 음성 가이드와 함께 이곳에 표시됩니다.</div>
         </div>
 
         <div class="panel">
@@ -163,7 +163,7 @@
     const auth = getAuth(app);
     const database = getDatabase(app);
 
-    // Google Apps Script Proxy 주소 (Claude 연동용)
+    // Google Apps Script Proxy 주소 (내부에서 ChatGPT를 안전하게 호출함)
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxTmD_aKFktnu5BcmOj0x84D15A5qOEkAbpoyJ7DEGzJR7UayIGwKLDL7nFhU3hbB_wVw/exec';
 
     const authSection = document.getElementById('authSection');
@@ -323,12 +323,12 @@
 
     window.playTtsFromLog = function(text) { speakText(text); };
 
-    askBtn.addEventListener('click', askClaude);
+    askBtn.addEventListener('click', askChatGPT);
     questionInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.ctrlKey) askClaude();
+      if (e.key === 'Enter' && e.ctrlKey) askChatGPT();
     });
 
-    async function askClaude() {
+    async function askChatGPT() {
       const question = questionInput.value.trim();
       if (!question) return alert('에러 증상 혹은 공학 질문을 작성하세요.');
       if (!currentUser) return alert('로그인이 필요합니다.');
@@ -336,7 +336,7 @@
       try {
         askBtn.disabled = true;
         askBtn.textContent = 'AI 진단 중...';
-        answerBox.textContent = 'Claude 가이드를 생성하는 중입니다. 잠시만 기다려주세요...';
+        answerBox.textContent = 'ChatGPT 가이드를 생성하는 중입니다. 잠시만 기다려주세요...';
         setStatus('Apps Script 연동 서버 통신 중...');
 
         const response = await fetch(APPS_SCRIPT_URL, {
