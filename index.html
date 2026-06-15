@@ -49,7 +49,7 @@
     .top-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 22px; padding: 14px; border-radius: 16px; background: #f7f9fb; }
     .user-info { font-size: 14px; color: #555; }
 
-    /* 레이아웃 분할 (좌측: 질문/TTS설정, 우측: 디버깅 기록 히스토리) */
+    /* 레이아웃 분할 */
     .workspace { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; margin-top: 20px; }
     .panel { display: flex; flex-direction: column; gap: 16px; }
 
@@ -66,7 +66,6 @@
     .danger-btn { background: #ef5350; color: white; }
     .dark-btn { background: #455a64; color: white; }
     .tts-btn { background: #ab47bc; color: white; }
-    .cancel-btn { background: #b0bec5; color: white; }
 
     /* 리스트 스타일 */
     .status { min-height: 20px; color: #666; font-size: 13px; }
@@ -90,7 +89,7 @@
 <body>
   <div class="container">
     <h1>👨‍💻 스마트 공학 디버깅 메이트</h1>
-    <div class="subtitle">Firebase + ChatGPT API + 웹 TTS 연동 하드웨어 가이드 플랫폼</div>
+    <div class="subtitle">Firebase + Claude 3.5 API + 웹 TTS 연동 하드웨어 가이드 플랫폼</div>
 
     <section id="authSection">
       <div class="auth-box">
@@ -113,7 +112,7 @@
 
       <div class="workspace">
         <div class="panel">
-          <h3>🔍 AI 디버깅 가이드 요청</h3>
+          <h3>🔍 Claude AI 디버깅 가이드 요청</h3>
           <textarea id="questionInput" placeholder="회로 에러 증상이나 공학 개념을 질문하세요.&#13;예) 아두이노 Uno에 LED를 연결했는데 불이 안 들어와. 해결 절차 알려줘."></textarea>
           
           <div class="option-box">
@@ -127,8 +126,8 @@
             <button class="tts-btn" id="stopTtsBtn">🔊 음성 중지</button>
           </div>
 
-          <h4>📢 실시간 AI 분석 결과</h4>
-          <div id="answerBox" class="answer-display">아직 생성된 가이드가 없습니다. 질문을 입력하면 음성 가이드와 함께 이곳에 표시됩니다.</div>
+          <h4>📢 실시간 AI 분석 결과 (Claude 3.5)</h4>
+          <div id="answerBox" class="answer-display">아직 생성된 가이드가 없습니다. 질문을 입력하면 Claude의 음성 가이드와 함께 이곳에 표시됩니다.</div>
         </div>
 
         <div class="panel">
@@ -146,9 +145,9 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-    import { getDatabase, ref, push, set, update, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+    import { getDatabase, ref, push, set, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
-    // Firebase 설정
+    // Firebase 설정 정보
     const firebaseConfig = {
       apiKey: 'AIzaSyDO-v52Ehwphh5gW0WBzu9_DliMhOzy4Yo',
       authDomain: 'kang-f4e85.firebaseapp.com',
@@ -164,10 +163,9 @@
     const auth = getAuth(app);
     const database = getDatabase(app);
 
-    // Google Apps Script URL (ChatGPT Proxy)
+    // Google Apps Script Proxy 주소 (Claude 연동용)
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxTmD_aKFktnu5BcmOj0x84D15A5qOEkAbpoyJ7DEGzJR7UayIGwKLDL7nFhU3hbB_wVw/exec';
 
-    // DOM 객체 바인딩
     const authSection = document.getElementById('authSection');
     const mainSection = document.getElementById('mainSection');
     const emailInput = document.getElementById('emailInput');
@@ -191,12 +189,9 @@
     let currentItemsRef = null;
     let voices = [];
 
-    // --- [기능 1: Web Speech API TTS 초기화] ---
     function loadVoices() {
       voices = window.speechSynthesis.getVoices();
       voiceSelect.innerHTML = '';
-      
-      // 한국어 음성 우선 배치 후 목록 추가
       const koVoices = voices.filter(v => v.lang.includes('ko'));
       const otherVoices = voices.filter(v => !v.lang.includes('ko'));
       const sortedVoices = [...koVoices, ...otherVoices];
@@ -214,7 +209,7 @@
     loadVoices();
 
     function speakText(text) {
-      window.speechSynthesis.cancel(); // 현재 도는 음성 청소
+      window.speechSynthesis.cancel();
       if (!text) return;
 
       const utterance = new SpeechSynthesisUtterance(text);
@@ -228,7 +223,6 @@
 
     stopTtsBtn.addEventListener('click', () => window.speechSynthesis.cancel());
 
-    // --- [기능 2: Firebase Auth 인증] ---
     function setStatus(msg) { statusBox.textContent = msg; }
 
     signupBtn.addEventListener('click', async () => {
@@ -264,7 +258,6 @@
       }
     });
 
-    // --- [기능 3: Firebase RTDB 실시간 연동 (CRUD)] ---
     function startDataListener(uid) {
       stopDataListener();
       setStatus('디버깅 기록 동기화 중...');
@@ -283,7 +276,6 @@
 
     refreshBtn.addEventListener('click', () => currentUser && startDataListener(currentUser.uid));
 
-    // 데이터 저장 트리거 (ChatGPT 답변 확보 시 호출할 함수)
     async function saveLogToFirebase(question, answer) {
       if(!currentUser) return;
       try {
@@ -331,13 +323,12 @@
 
     window.playTtsFromLog = function(text) { speakText(text); };
 
-    // --- [기능 4: ChatGPT 연동 및 통합 플로우] ---
-    askBtn.addEventListener('click', askChatGPT);
+    askBtn.addEventListener('click', askClaude);
     questionInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.ctrlKey) askChatGPT();
+      if (e.key === 'Enter' && e.ctrlKey) askClaude();
     });
 
-    async function askChatGPT() {
+    async function askClaude() {
       const question = questionInput.value.trim();
       if (!question) return alert('에러 증상 혹은 공학 질문을 작성하세요.');
       if (!currentUser) return alert('로그인이 필요합니다.');
@@ -345,10 +336,9 @@
       try {
         askBtn.disabled = true;
         askBtn.textContent = 'AI 진단 중...';
-        answerBox.textContent = 'ChatGPT 가이드를 생성하는 중입니다. 잠시만 기다려주세요...';
+        answerBox.textContent = 'Claude 가이드를 생성하는 중입니다. 잠시만 기다려주세요...';
         setStatus('Apps Script 연동 서버 통신 중...');
 
-        // 1. Google Apps Script Proxy 서버 호출
         const response = await fetch(APPS_SCRIPT_URL, {
           method: 'POST',
           body: JSON.stringify({ question: question })
@@ -358,11 +348,9 @@
 
         const aiAnswer = data.answer || '답변을 불러오지 못했습니다.';
         
-        // 2. 화면에 표시 및 음성 가이드 자동 실행 (TTS)
         answerBox.textContent = aiAnswer;
         speakText(aiAnswer);
 
-        // 3. 결과를 Firebase 실시간 DB에 기록 보관 (Create)
         await saveLogToFirebase(question, aiAnswer);
         questionInput.value = '';
         setStatus('진단 완료 및 히스토리 자동 저장됨');
@@ -377,7 +365,6 @@
       }
     }
 
-    // 기본 이스케이프 유틸리티
     function escapeHTML(text) {
       return String(text).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
     }
