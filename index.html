@@ -89,7 +89,7 @@
 <body>
   <div class="container">
     <h1>👨‍💻 스마트 공학 디버깅 메이트</h1>
-    <div class="subtitle">Firebase + ChatGPT API + 웹 TTS 연동 하드웨어 가이드 플랫폼</div>
+    <div class="subtitle">Firebase 연동 + ChatGPT 직접 호출 하드웨어 가이드 플랫폼</div>
 
     <section id="authSection">
       <div class="auth-box">
@@ -99,8 +99,9 @@
         <button class="dark-btn" id="signupBtn">회원가입</button>
       </div>
       <div class="notice">
-        💡 <b>안내</b><br />
-        처음 방문하셨다면 이메일과 패스워드 입력 후 [회원가입]을, 계정이 있다면 [로그인]을 눌러주세요.
+        💡 <b>안내 및 보안 주의</b><br />
+        본 플랫폼은 Firebase Auth 및 Realtime DB를 사용합니다.<br />
+        <span style="color: #d32f2f; font-weight: bold;">※ 이 소스코드를 GitHub Public 저장소에 올리면 API 키가 즉시 만료되니 반드시 Private 저장소를 이용하세요!</span>
       </div>
     </section>
 
@@ -112,7 +113,7 @@
 
       <div class="workspace">
         <div class="panel">
-          <h3>🔍 AI 디버깅 가이드 요청 (ChatGPT)</h3>
+          <h3>🔍 AI 디버깅 가이드 요청 (ChatGPT 직접 연결)</h3>
           <textarea id="questionInput" placeholder="회로 에러 증상이나 공학 개념을 질문하세요.&#13;예) 아두이노 Uno에 LED를 연결했는데 불이 안 들어와. 해결 절차 알려줘."></textarea>
           
           <div class="option-box">
@@ -147,7 +148,10 @@
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
     import { getDatabase, ref, push, set, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
-    // Firebase 설정 정보
+    // 1. OpenAI API 키 설정 (★주의: 깃허브 Public 업로드 금지)
+    const OPENAI_API_KEY = '이곳에_새로_발급받은_API_키를_넣으세요';
+
+    // 2. Firebase 설정 정보
     const firebaseConfig = {
       apiKey: 'AIzaSyDO-v52Ehwphh5gW0WBzu9_DliMhOzy4Yo',
       authDomain: 'kang-f4e85.firebaseapp.com',
@@ -162,9 +166,6 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const database = getDatabase(app);
-
-    // Google Apps Script Proxy 주소 (내부에서 ChatGPT를 안전하게 호출함)
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxTmD_aKFktnu5BcmOj0x84D15A5qOEkAbpoyJ7DEGzJR7UayIGwKLDL7nFhU3hbB_wVw/exec';
 
     const authSection = document.getElementById('authSection');
     const mainSection = document.getElementById('mainSection');
@@ -189,6 +190,7 @@
     let currentItemsRef = null;
     let voices = [];
 
+    // --- [TTS 음성 가이드 시스템] ---
     function loadVoices() {
       voices = window.speechSynthesis.getVoices();
       voiceSelect.innerHTML = '';
@@ -225,6 +227,7 @@
 
     function setStatus(msg) { statusBox.textContent = msg; }
 
+    // --- [Firebase Auth 회원 관리] ---
     signupBtn.addEventListener('click', async () => {
       const email = emailInput.value.trim(); const password = passwordInput.value.trim();
       if(!email || !password) return alert('모두 입력해주세요.');
@@ -258,6 +261,7 @@
       }
     });
 
+    // --- [Firebase 실시간 데이터베이스 연동] ---
     function startDataListener(uid) {
       stopDataListener();
       setStatus('디버깅 기록 동기화 중...');
@@ -323,6 +327,7 @@
 
     window.playTtsFromLog = function(text) { speakText(text); };
 
+    // --- [ChatGPT API 직접 연동 플로우] ---
     askBtn.addEventListener('click', askChatGPT);
     questionInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && e.ctrlKey) askChatGPT();
@@ -332,28 +337,56 @@
       const question = questionInput.value.trim();
       if (!question) return alert('에러 증상 혹은 공학 질문을 작성하세요.');
       if (!currentUser) return alert('로그인이 필요합니다.');
+      if (OPENAI_API_KEY === '이곳에_새로_발급받은_API_키를_넣으세요' || !OPENAI_API_KEY) {
+        return alert('코드 상단의 OPENAI_API_KEY 변수에 올바른 API 키를 입력해 주세요.');
+      }
 
       try {
         askBtn.disabled = true;
         askBtn.textContent = 'AI 진단 중...';
-        answerBox.textContent = 'ChatGPT 가이드를 생성하는 중입니다. 잠시만 기다려주세요...';
-        setStatus('Apps Script 연동 서버 통신 중...');
+        answerBox.textContent = 'ChatGPT가 가이드를 생성하는 중입니다. 잠시만 기다려주세요...';
+        setStatus('OpenAI 서버 직접 통신 중...');
 
-        const response = await fetch(APPS_SCRIPT_URL, {
+        // OpenAI Chat Completions API 직접 호출 (서버 없이 프론트엔드에서 발송)
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
-          body: JSON.stringify({ question: question })
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini', // 빠르고 가성비 좋은 미니 모델 지정
+            temperature: 0.7,
+            messages: [
+              {
+                role: 'system',
+                content: '당신은 하드웨어 및 스마트 공학 디버깅 전문가입니다. 사용자의 회로 에러나 질문에 대해 친절하고 명확하게 단계별 해결 절차를 한국어로 가이드하세요.'
+              },
+              {
+                role: 'user',
+                content: question
+              }
+            ]
+          })
         });
-        const data = await response.json();
-        if (data.error) throw new Error(data.error);
 
-        const aiAnswer = data.answer || '답변을 불러오지 못했습니다.';
+        const data = await response.json();
         
+        // API 측에서 에러가 반환된 경우 (401 등) 처리
+        if (data.error) {
+          throw new Error(`${data.error.code || 'API_ERROR'}: ${data.error.message}`);
+        }
+
+        const aiAnswer = data.choices[0].message.content || '답변을 불러오지 못했습니다.';
+        
+        // 1. 화면 출력 및 음성 읽기
         answerBox.textContent = aiAnswer;
         speakText(aiAnswer);
 
+        // 2. 대화 기록 보관을 위해 Firebase 실시간 DB에 기록 (Create)
         await saveLogToFirebase(question, aiAnswer);
         questionInput.value = '';
-        setStatus('진단 완료 및 히스토리 자동 저장됨');
+        setStatus('진단 완료 및 Firebase 자동 저장 완료');
 
       } catch (error) {
         console.error(error);
@@ -365,6 +398,7 @@
       }
     }
 
+    // 보안 이스케이프 유틸리티
     function escapeHTML(text) {
       return String(text).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
     }
